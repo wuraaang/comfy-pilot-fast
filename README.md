@@ -6,13 +6,14 @@ Comfy Pilot adds a Claude Code terminal directly inside ComfyUI with an MCP serv
 
 ## What this fixes
 
-The original plugin has three bugs that cause the embedded terminal to crash immediately on cloud setups:
+The original plugin has bugs that cause the embedded terminal to crash or disconnect on cloud setups:
 
 | Bug | Symptom | Fix |
 |-----|---------|-----|
 | `CLAUDECODE` env var leaks into PTY | `Error: Claude Code cannot be launched inside another Claude Code session` | Strip the variable from child process env |
 | No `--dangerously-skip-permissions` | Terminal hangs on permission prompts (can't click Accept/Reject in xterm.js) | Auto-add the flag |
 | `claude -c` resumes active sessions | Immediate crash when another Claude session exists in the same directory | Always start fresh sessions |
+| No WebSocket heartbeat | Terminal disconnects after ~30-60s of inactivity (proxy timeout) | Add `heartbeat=20` keepalive ping |
 
 These fixes are proposed upstream via [PR](https://github.com/ConstantineB6/comfy-pilot/pulls) and relate to [issue #9](https://github.com/ConstantineB6/comfy-pilot/issues/9).
 
@@ -100,6 +101,9 @@ ComfyUI Browser UI
 
 ### Terminal disconnects immediately
 This is what the fixes in this repo solve. Make sure you ran the install script and restarted ComfyUI.
+
+### Terminal disconnects after inactivity
+The install script adds a WebSocket heartbeat (ping every 20s) that keeps the connection alive through proxies (RunPod, Cloudflare, etc.). If you still have issues, it may be your browser's network settings.
 
 ### "Command 'claude' not found"
 The plugin auto-installs Claude Code CLI. If that fails:

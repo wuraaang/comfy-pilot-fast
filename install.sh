@@ -48,9 +48,9 @@ cd "$PLUGIN_DIR"
 # Fix 1: Remove CLAUDECODE env var from PTY to prevent nested session error
 if ! grep -q 'env.pop("CLAUDECODE"' __init__.py; then
     sed -i '/env\["COLORTERM"\] = "truecolor"/a\            # Remove CLAUDECODE to prevent "nested session" detection\n            env.pop("CLAUDECODE", None)' __init__.py
-    echo -e "  ${GREEN}[1/2]${NC} Fixed: CLAUDECODE nested session prevention"
+    echo -e "  ${GREEN}[1/3]${NC} Fixed: CLAUDECODE nested session prevention"
 else
-    echo -e "  ${GREEN}[1/2]${NC} Already patched: CLAUDECODE fix"
+    echo -e "  ${GREEN}[1/3]${NC} Already patched: CLAUDECODE fix"
 fi
 
 # Fix 2: Use --dangerously-skip-permissions + remove -c flag
@@ -101,9 +101,17 @@ content = content.replace(old_func, new_func)
 with open("__init__.py", "w") as f:
     f.write(content)
 PYFIX
-    echo -e "  ${GREEN}[2/2]${NC} Fixed: permissions bypass + fresh sessions"
+    echo -e "  ${GREEN}[2/3]${NC} Fixed: permissions bypass + fresh sessions"
 else
-    echo -e "  ${GREEN}[2/2]${NC} Already patched: permissions fix"
+    echo -e "  ${GREEN}[2/3]${NC} Already patched: permissions fix"
+fi
+
+# Fix 3: Add WebSocket heartbeat to prevent proxy timeout disconnections
+if ! grep -q 'heartbeat=' __init__.py; then
+    sed -i 's/ws = web.WebSocketResponse()/ws = web.WebSocketResponse(heartbeat=20, autoping=True)/' __init__.py
+    echo -e "  ${GREEN}[3/3]${NC} Fixed: WebSocket keepalive (heartbeat every 20s)"
+else
+    echo -e "  ${GREEN}[3/3]${NC} Already patched: WebSocket keepalive"
 fi
 
 # Restart ComfyUI if running
