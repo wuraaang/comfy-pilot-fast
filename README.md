@@ -1,8 +1,8 @@
 # comfy-pilot-fast
 
-Fast install script for [Comfy Pilot](https://github.com/ConstantineB6/comfy-pilot) with critical bug fixes for cloud environments (RunPod, etc.).
+Fast install script for [Comfy Pilot](https://github.com/ConstantineB6/comfy-pilot) with critical bug fixes for cloud environments (RunPod, etc.) and **multi-backend support** (Claude Code + OpenCode).
 
-Comfy Pilot adds a Claude Code terminal directly inside ComfyUI with an MCP server that gives Claude full access to your workflow (create/delete/connect nodes, execute, view images).
+Comfy Pilot adds an AI coding agent terminal directly inside ComfyUI with an MCP server that gives the agent full access to your workflow (create/delete/connect nodes, execute, view images).
 
 ## What this fixes
 
@@ -15,8 +15,27 @@ The original plugin has bugs that cause the embedded terminal to crash or discon
 | `claude -c` resumes active sessions | Immediate crash when another Claude session exists in the same directory | Always start fresh sessions |
 | No WebSocket heartbeat | Terminal disconnects after ~30-60s of inactivity (proxy timeout) | Add `heartbeat=20` keepalive ping |
 | No session persistence | Lose all context on ComfyUI restart | `--continue` flag + resume prompt + auto-reconnect |
+| Claude Code only | No way to use other AI backends | Multi-backend: auto-detect Claude Code or OpenCode |
 
 These fixes are proposed upstream via [PR](https://github.com/ConstantineB6/comfy-pilot/pulls) and relate to [issue #9](https://github.com/ConstantineB6/comfy-pilot/issues/9).
+
+## Multi-Backend Support
+
+The install script patches Comfy Pilot to support **both Claude Code and OpenCode** as backends. The plugin auto-detects which one is installed and adapts automatically.
+
+| | Claude Code | OpenCode |
+|---|---|---|
+| **MCP config** | `claude mcp add` (automatic) | `opencode.json` written automatically |
+| **Permissions** | `--dangerously-skip-permissions` | Native TUI (a/A/d keys) |
+| **Session resume** | `--resume <uuid>` | `--session <id>` |
+| **Install** | `curl -fsSL https://claude.ai/install.sh \| bash` | `curl -fsSL https://opencode.ai/install \| bash` |
+
+**Detection order:** `COMFY_PILOT_BACKEND` env var > `opencode` on PATH > `claude` on PATH > fallback to Claude Code.
+
+```bash
+# Force a specific backend
+export COMFY_PILOT_BACKEND=opencode   # or claude
+```
 
 ## Install (one command)
 
@@ -50,21 +69,23 @@ env -u CLAUDECODE python3 main.py --listen 0.0.0.0 --port 8188
 ## Usage
 
 1. Open ComfyUI in your browser
-2. Click the **Claude Code** button in the toolbar (or right-click canvas)
-3. A floating terminal opens with Claude Code connected via MCP
+2. Click the **Comfy Pilot** button in the toolbar (or right-click canvas > "Open Comfy Pilot")
+3. A floating terminal opens with your AI agent connected via MCP
 4. The green MCP indicator confirms the connection
-5. Ask Claude to manipulate your workflow: *"add a KSampler connected to a checkpoint loader"*
+5. Ask the agent to manipulate your workflow: *"add a KSampler connected to a checkpoint loader"*
+
+The window title shows which backend is active (Claude Code or OpenCode).
 
 ## What it does
 
 ```
 ComfyUI Browser UI
     │
-    ├── Claude Code button (toolbar)
+    ├── Comfy Pilot button (toolbar)
     │       │
     │       └── Floating xterm.js terminal
     │               │
-    │               └── Claude Code CLI (--dangerously-skip-permissions)
+    │               └── Claude Code CLI  or  OpenCode TUI
     │                       │
     │                       └── MCP Server (15 tools)
     │                               │
@@ -89,14 +110,13 @@ ComfyUI Browser UI
 | `/claude-code/run-node` | POST | Execute workflow up to a node |
 | `/claude-code/mcp-status` | GET | MCP connection status |
 | `/claude-code/memory` | GET | Plugin memory stats |
-| `/claude-code/platform` | GET | Platform info |
+| `/claude-code/platform` | GET | Platform info + active backend |
 
 ## Requirements
 
 - ComfyUI (any recent version)
-- Claude Code CLI (`npm install -g @anthropic-ai/claude-code` or auto-installed)
+- **Claude Code CLI** or **OpenCode CLI** (auto-installed if missing)
 - Linux (PTY required for the terminal; Windows not supported)
-- Active Claude subscription
 
 ## Troubleshooting
 
@@ -106,20 +126,37 @@ This is what the fixes in this repo solve. Make sure you ran the install script 
 ### Terminal disconnects after inactivity
 The install script adds a WebSocket heartbeat (ping every 20s) that keeps the connection alive through proxies (RunPod, Cloudflare, etc.). If you still have issues, it may be your browser's network settings.
 
+### Backend not detected
+Check the ComfyUI console for which backend was picked:
+```
+[Comfy Pilot] Plugin loaded successfully — backend: OpenCode (Memory: 32.3MB)
+```
+Force a backend with `COMFY_PILOT_BACKEND=opencode` or `COMFY_PILOT_BACKEND=claude`.
+
 ### "Command 'claude' not found"
 The plugin auto-installs Claude Code CLI. If that fails:
 ```bash
-npm install -g @anthropic-ai/claude-code
+curl -fsSL https://claude.ai/install.sh | bash
+```
+
+### "Command 'opencode' not found"
+```bash
+curl -fsSL https://opencode.ai/install | bash
 ```
 
 ### MCP indicator stays red
-Check that the MCP server was registered:
+
+**Claude Code:**
 ```bash
 claude mcp list
-```
-You should see `comfyui: ✓ Connected`. If not:
-```bash
+# Should show comfyui: ✓ Connected. If not:
 claude mcp add comfyui python3 /path/to/ComfyUI/custom_nodes/comfy-pilot/mcp_server.py
+```
+
+**OpenCode:** Check that `opencode.json` exists at ComfyUI root:
+```bash
+cat /path/to/ComfyUI/opencode.json
+# Should contain mcp.comfyui config. The plugin creates it automatically.
 ```
 
 ### ComfyUI started from Claude Code session
