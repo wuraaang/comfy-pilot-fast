@@ -41,16 +41,16 @@ else
 fi
 
 # Apply bug fixes
-echo -e "${GREEN}Applying fixes (terminal crash, permissions, nested sessions)...${NC}"
+echo -e "${GREEN}Applying fixes (terminal crash, permissions, nested sessions, session persistence)...${NC}"
 
 cd "$PLUGIN_DIR"
 
 # Fix 1: Remove CLAUDECODE env var from PTY to prevent nested session error
 if ! grep -q 'env.pop("CLAUDECODE"' __init__.py; then
     sed -i '/env\["COLORTERM"\] = "truecolor"/a\            # Remove CLAUDECODE to prevent "nested session" detection\n            env.pop("CLAUDECODE", None)' __init__.py
-    echo -e "  ${GREEN}[1/3]${NC} Fixed: CLAUDECODE nested session prevention"
+    echo -e "  ${GREEN}[1/4]${NC} Fixed: CLAUDECODE nested session prevention"
 else
-    echo -e "  ${GREEN}[1/3]${NC} Already patched: CLAUDECODE fix"
+    echo -e "  ${GREEN}[1/4]${NC} Already patched: CLAUDECODE fix"
 fi
 
 # Fix 2: Use --dangerously-skip-permissions + remove -c flag
@@ -85,7 +85,7 @@ new_func = '''def get_claude_command(working_dir=None):
 
     Returns the full path to claude with --dangerously-skip-permissions
     to avoid blocking permission prompts in the embedded terminal.
-    Always starts a fresh session to avoid conflicts with active conversations.
+    Uses --continue to resume the last conversation across ComfyUI restarts.
     """
     # Try to get the full path to claude
     claude_path = find_executable("claude")
@@ -94,24 +94,33 @@ new_func = '''def get_claude_command(working_dir=None):
 
     # Always use --dangerously-skip-permissions for embedded terminal
     # (permission prompts don't work well in the xterm.js widget)
-    return f"{claude_path} --dangerously-skip-permissions"'''
+    # --continue resumes the last conversation so MCP context survives restarts
+    return f"{claude_path} --dangerously-skip-permissions --continue"'''
 
 content = content.replace(old_func, new_func)
 
 with open("__init__.py", "w") as f:
     f.write(content)
 PYFIX
-    echo -e "  ${GREEN}[2/3]${NC} Fixed: permissions bypass + fresh sessions"
+    echo -e "  ${GREEN}[2/4]${NC} Fixed: permissions bypass + session resume"
 else
-    echo -e "  ${GREEN}[2/3]${NC} Already patched: permissions fix"
+    echo -e "  ${GREEN}[2/4]${NC} Already patched: permissions fix"
 fi
 
 # Fix 3: Add WebSocket heartbeat to prevent proxy timeout disconnections
 if ! grep -q 'heartbeat=' __init__.py; then
     sed -i 's/ws = web.WebSocketResponse()/ws = web.WebSocketResponse(heartbeat=20, autoping=True)/' __init__.py
-    echo -e "  ${GREEN}[3/3]${NC} Fixed: WebSocket keepalive (heartbeat every 20s)"
+    echo -e "  ${GREEN}[3/4]${NC} Fixed: WebSocket keepalive (heartbeat every 20s)"
 else
-    echo -e "  ${GREEN}[3/3]${NC} Already patched: WebSocket keepalive"
+    echo -e "  ${GREEN}[3/4]${NC} Already patched: WebSocket keepalive"
+fi
+
+# Fix 4: Add --continue flag for session persistence across restarts
+if grep -q 'dangerously-skip-permissions"' __init__.py && ! grep -q '\-\-continue' __init__.py; then
+    sed -i 's/--dangerously-skip-permissions"/--dangerously-skip-permissions --continue"/' __init__.py
+    echo -e "  ${GREEN}[4/4]${NC} Fixed: session persistence (--continue)"
+else
+    echo -e "  ${GREEN}[4/4]${NC} Already patched: session persistence"
 fi
 
 # Restart ComfyUI if running
