@@ -14,6 +14,7 @@ The original plugin has bugs that cause the embedded terminal to crash or discon
 | No `--dangerously-skip-permissions` | Terminal hangs on permission prompts (can't click Accept/Reject in xterm.js) | Auto-add the flag |
 | `claude -c` resumes active sessions | Immediate crash when another Claude session exists in the same directory | Always start fresh sessions |
 | No WebSocket heartbeat | Terminal disconnects after ~30-60s of inactivity (proxy timeout) | Add `heartbeat=20` keepalive ping |
+| No session persistence | Lose all context on ComfyUI restart | `--continue` flag + resume prompt + auto-reconnect |
 
 These fixes are proposed upstream via [PR](https://github.com/ConstantineB6/comfy-pilot/pulls) and relate to [issue #9](https://github.com/ConstantineB6/comfy-pilot/issues/9).
 
